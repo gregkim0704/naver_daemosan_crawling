@@ -110,9 +110,13 @@ class NaverRealEstateAPIClient {
         console.log(`API 호출 실패: ${response.status}`);
         return [];
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error.response?.status === 429) {
+        console.log(`Rate limit 오류 (429): 네이버가 요청을 제한했습니다.`);
+        throw new Error('네이버 API Rate Limit 초과: 잠시 후 다시 시도해주세요.');
+      }
       console.log(`단지 마커 조회 중 오류: ${error}`);
-      return [];
+      throw error;
     }
   }
 
@@ -221,14 +225,33 @@ class NaverRealEstateAPIClient {
     console.log("네이버 부동산 데이터 크롤링 시작...");
     console.log(`위치: 위도 ${lat}, 경도 ${lon}, 줌 레벨 ${zoom}`);
 
-    // 단지 마커 정보 조회
-    const complexData = await this.getComplexMarkers(lat, lon, zoom);
+    try {
+      // 단지 마커 정보 조회
+      const complexData = await this.getComplexMarkers(lat, lon, zoom);
 
-    if (complexData.length === 0) {
+      if (complexData.length === 0) {
+        console.log("조회된 단지 정보가 없습니다.");
+        return {
+          complexes: [],
+          summary: { 
+            totalCount: 0, 
+            timestamp: new Date().toISOString(),
+            location: { lat, lon, zoom },
+          },
+        };
+      }
+    } catch (error: any) {
+      if (error.message.includes('Rate Limit')) {
+        throw error;
+      }
       console.log("조회된 단지 정보가 없습니다.");
       return {
         complexes: [],
-        summary: { totalCount: 0, timestamp: new Date().toISOString() },
+        summary: { 
+          totalCount: 0, 
+          timestamp: new Date().toISOString(),
+          location: { lat, lon, zoom },
+        },
       };
     }
 
@@ -280,10 +303,29 @@ export async function POST(request: NextRequest) {
     const data = await client.crawlRealEstateData(lat, lon, zoom);
 
     return NextResponse.json(data);
-  } catch (error) {
+  } catch (error: any) {
     console.error("크롤링 중 오류:", error);
+    
+    if (error.message && error.message.includes('Rate Limit')) {
+      return NextResponse.json(
+        { 
+          error: "⚠️ 네이버 API 요청 제한이 발생했습니다.",
+          details: "네이버 부동산이 일시적으로 API 요청을 제한하고 있습니다. 이는 다음과 같은 이유로 발생할 수 있습니다:\n\n" +
+                   "1. 짧은 시간 내 너무 많은 요청\n" +
+                   "2. 네이버의 봇 감지 시스템\n" +
+                   "3. API 인증 토큰 부족\n\n" +
+                   "💡 해결 방법:\n" +
+                   "- 5-10분 후 다시 시도해주세요\n" +
+                   "- 또는 브라우저에서 직접 네이버 부동산(new.land.naver.com)을 방문하여 확인하세요\n" +
+                   "- Python 로컬 크롤러를 사용하면 더 안정적으로 수집 가능합니다 (logic/naver_api_crawler.py)",
+          suggestion: "네이버 부동산 웹사이트를 직접 방문하거나 잠시 후 다시 시도해주세요."
+        },
+        { status: 429 },
+      );
+    }
+    
     return NextResponse.json(
-      { error: "크롤링 중 오류가 발생했습니다." },
+      { error: "크롤링 중 오류가 발생했습니다. 네이버 API가 응답하지 않거나 데이터가 없을 수 있습니다." },
       { status: 500 },
     );
   }

@@ -131,7 +131,13 @@ export default function Home() {
 
       setData(response.data);
     } catch (err: any) {
-      setError(err.response?.data?.error || "크롤링 중 오류가 발생했습니다.");
+      const errorData = err.response?.data;
+      if (errorData?.details) {
+        // 상세한 에러 메시지가 있으면 표시
+        setError(`${errorData.error}\n\n${errorData.details}`);
+      } else {
+        setError(errorData?.error || "크롤링 중 오류가 발생했습니다.");
+      }
     } finally {
       setLoading(false);
     }
@@ -361,7 +367,7 @@ export default function Home() {
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-8">
             <div className="flex">
-              <div className="text-red-800">
+              <div className="text-red-800 whitespace-pre-line">
                 <strong>오류:</strong> {error}
               </div>
             </div>
