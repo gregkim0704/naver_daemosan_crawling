@@ -29,6 +29,7 @@ interface CrawlingResult {
       lon: number;
       zoom: number;
     };
+    isSampleData?: boolean;
   };
 }
 
@@ -138,6 +139,21 @@ export default function Home() {
       } else {
         setError(errorData?.error || "크롤링 중 오류가 발생했습니다.");
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLoadSample = async () => {
+    setLoading(true);
+    setError(null);
+    setData(null);
+
+    try {
+      const response = await axios.get("/api/crawl-sample");
+      setData(response.data);
+    } catch (err: any) {
+      setError("샘플 데이터 로드 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
@@ -354,13 +370,22 @@ export default function Home() {
             </div>
           </div>
 
-          <button
-            onClick={handleCrawl}
-            disabled={loading}
-            className="w-full md:w-auto px-6 py-3 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? "크롤링 중..." : "크롤링 시작"}
-          </button>
+          <div className="flex flex-col md:flex-row gap-3">
+            <button
+              onClick={handleCrawl}
+              disabled={loading}
+              className="flex-1 md:flex-none px-6 py-3 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? "크롤링 중..." : "크롤링 시작"}
+            </button>
+            <button
+              onClick={handleLoadSample}
+              disabled={loading}
+              className="flex-1 md:flex-none px-6 py-3 bg-green-600 text-white font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? "로딩 중..." : "📦 샘플 데이터 로드"}
+            </button>
+          </div>
         </div>
 
         {/* 오류 메시지 */}
@@ -378,7 +403,14 @@ export default function Home() {
         {data && (
           <div className="bg-white rounded-lg shadow-md p-6 mb-8">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">크롤링 결과</h2>
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-semibold">크롤링 결과</h2>
+                {data.summary.isSampleData && (
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                    📦 샘플 데이터
+                  </span>
+                )}
+              </div>
               <div className="space-x-2">
                 <button
                   onClick={downloadAsJson}
